@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
     override fun onBackPressed() {
         super.onBackPressed()
         timerViewModel.stopMediaPlayer()
+        timerViewModel.stopTimerJob("Back pressed")
     }
 }
 

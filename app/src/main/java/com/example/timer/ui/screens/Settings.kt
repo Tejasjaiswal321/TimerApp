@@ -46,17 +46,17 @@ fun Settings(
             // Odd-Even Timer inputs
             InputRow(
                 "Odd Duration \n(minutes)",
-                timerViewModel.oddTime.value
+                timerViewModel.oddIntervalMinutes.value
             ) {
-                timerViewModel.oddTime.value = it
+                timerViewModel.oddIntervalMinutes.value = it
                 timerViewModel.savePreferences()
             }
             Spacer(modifier = Modifier.height(8.dp))
             InputRow(
                 "Even Duration \n(minutes)",
-                timerViewModel.evenTime.value
+                timerViewModel.evenIntervalMinutes.value
             ) { it: String ->
-                timerViewModel.evenTime.value = it
+                timerViewModel.evenIntervalMinutes.value = it
                 timerViewModel.savePreferences()
             }
 
@@ -111,9 +111,9 @@ fun Settings(
                 onNextClick()
                 if (mode == Mode.OddEven) {
                     timerViewModel.oddEvenTimer(
-                        oddTime = timerViewModel.oddTime.value.toIntOrNull() ?: 0,
-                        evenTime = timerViewModel.evenTime.value.toIntOrNull() ?: 0,
-                        cycles = timerViewModel.cycleCount.value.toIntOrNull() ?: 0,
+                        oddIntervalInMin = timerViewModel.oddIntervalMinutes.value.toLongOrNull() ?: 0L,
+                        evenIntervalInMin = timerViewModel.evenIntervalMinutes.value.toLongOrNull() ?: 0L,
+                        cycles = timerViewModel.cycleCount.value.toLongOrNull() ?: 0L,
                         beepDuration = timerViewModel.beepDuration.value.toLongOrNull() ?: 5L,
                         soundUri = timerViewModel.selectedSoundUri.value,
                         contentResolver = context.contentResolver

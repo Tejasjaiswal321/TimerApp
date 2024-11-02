@@ -10,19 +10,19 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.timer.data.Mode
 import com.example.timer.util.PreferencesKeys
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.util.stream.IntStream.range
+import java.util.concurrent.CancellationException
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -38,14 +38,14 @@ class TimerViewModelFactory(private val application: Application) : ViewModelPro
     }
 }
 
-class TimerViewModel(application: Application) : AndroidViewModel(application) {
+open class TimerViewModel(val context:Context) :ViewModel() {
 
     private val tag = "TimerViewModel"
 
     private val _mode = MutableStateFlow(Mode.OddEven)
     val mode get() = _mode
-    var oddTime = mutableStateOf("")
-    var evenTime = mutableStateOf("")
+    var oddIntervalMinutes = mutableStateOf("")
+    var evenIntervalMinutes = mutableStateOf("")
     var cycleCount = mutableStateOf("")
     var randomTimes = mutableStateOf("")
     var beepDuration = mutableStateOf("5")
@@ -53,29 +53,26 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
     val selectedSoundUri: StateFlow<Uri> get() = _selectedSoundUri
 
     var mediaPlayer: MediaPlayer? = null
+    var timerJob : Job? = null
 
 
-    private val _timerProgress = MutableStateFlow(1f) // 1.0 for full progress, 0.0 when timer ends
-    val timerProgress: StateFlow<Float> get() = _timerProgress
+    private val _oddTimeLeft = MutableStateFlow(-1L) // 1.0 for full progress, 0.0 when timer ends
+    val oddTimeLeft: StateFlow<Long> get() = _oddTimeLeft
+    private val _evenTimeLeft = MutableStateFlow(-1L) // 1.0 for full progress, 0.0 when timer ends
+    val evenTimeLeft: StateFlow<Long> get() = _evenTimeLeft
 
     private val _isMusicPlaying = MutableStateFlow(false)
     val isMusicPlaying: StateFlow<Boolean> get() = _isMusicPlaying
 
-    private val _currentCycle = MutableStateFlow(0)
-    val currentCycle: StateFlow<Int> get() = _currentCycle
+    private val _currentCycle = MutableStateFlow(0L)
+    val currentCycle: StateFlow<Long> get() = _currentCycle
 
 
-    suspend fun startTimer(duration: Long) {
-        var remainingTime = duration
-        _isMusicPlaying.value = false
-        _timerProgress.value = 1f
-        while (remainingTime > 0) {
-            _timerProgress.value = remainingTime / duration.toFloat()
-            delay(1000) // Update every second
-            remainingTime -= 1000
+    suspend fun startTimer(timeLeft: MutableStateFlow<Long>, duration: Long) {
+        while (timeLeft.value > 0) {
+            delay(500)
+            timeLeft.value -= 500
         }
-        _timerProgress.value = 0f
-        _isMusicPlaying.value = true // Start music animation when timer ends
     }
 
     init {
@@ -88,12 +85,11 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
 
 
     private fun loadPreferences() {
-        val context = getApplication<Application>().applicationContext
         viewModelScope.launch {
             context.dataStore.data
                 .map { preferences ->
-                    oddTime.value = preferences[PreferencesKeys.ODD_TIME] ?: ""
-                    evenTime.value = preferences[PreferencesKeys.EVEN_TIME] ?: ""
+                    oddIntervalMinutes.value = preferences[PreferencesKeys.ODD_TIME] ?: ""
+                    evenIntervalMinutes.value = preferences[PreferencesKeys.EVEN_TIME] ?: ""
                     cycleCount.value = preferences[PreferencesKeys.CYCLE_COUNT] ?: ""
                     randomTimes.value = preferences[PreferencesKeys.RANDOM_TIMES] ?: ""
                     beepDuration.value = preferences[PreferencesKeys.BEEP_DURATION] ?: "5"
@@ -105,12 +101,11 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun savePreferences() {
-        val context = getApplication<Application>().applicationContext
         Log.d(tag, "saving Preferences")
         viewModelScope.launch {
             context.dataStore.edit { preferences ->
-                preferences[PreferencesKeys.ODD_TIME] = oddTime.value
-                preferences[PreferencesKeys.EVEN_TIME] = evenTime.value
+                preferences[PreferencesKeys.ODD_TIME] = oddIntervalMinutes.value
+                preferences[PreferencesKeys.EVEN_TIME] = evenIntervalMinutes.value
                 preferences[PreferencesKeys.CYCLE_COUNT] = cycleCount.value
                 preferences[PreferencesKeys.RANDOM_TIMES] = randomTimes.value
                 preferences[PreferencesKeys.BEEP_DURATION] = beepDuration.value
@@ -139,19 +134,23 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun oddEvenTimer(
-        oddTime: Int,
-        evenTime: Int,
-        cycles: Int,
+        oddIntervalInMin: Long,
+        evenIntervalInMin: Long,
+        cycles: Long,
         beepDuration: Long,
         soundUri: Uri = selectedSoundUri.value,
         contentResolver: ContentResolver
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            for (i in range(1, cycles + 1)) {
+        timerJob = viewModelScope.launch(Dispatchers.IO) {
+            for (i in 1..cycles) {
+                val totalOddTime = oddIntervalInMin * 1000L
+                val totalEvenTime = evenIntervalInMin * 1000L
                 _currentCycle.value = i
-                startTimer(oddTime * 1000L)
+                _oddTimeLeft.value = totalOddTime
+                _evenTimeLeft.value = totalEvenTime
+                startTimer(_oddTimeLeft, totalOddTime)
                 playBeep(soundUri, beepDuration, contentResolver)
-                startTimer(evenTime * 1000L)
+                startTimer(_evenTimeLeft, totalEvenTime)
                 playBeep(soundUri, beepDuration, contentResolver)
             }
         }
@@ -174,6 +173,8 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
         duration: Long,
         contentResolver: ContentResolver
     ) {
+        Log.d(tag,"playBeep start")
+        _isMusicPlaying.value = true
         mediaPlayer = MediaPlayer().apply {
             setDataSource(contentResolver.openAssetFileDescriptor(soundUri, "r")!!.fileDescriptor)
             prepare()
@@ -181,12 +182,20 @@ class TimerViewModel(application: Application) : AndroidViewModel(application) {
             Log.d(tag, "playbeep with uri = $soundUri")
         }
         delay(duration * 1000L)
-
         stopMediaPlayer()
+        Log.d(tag,"playBeep end")
     }
 
     fun stopMediaPlayer() {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
+        Log.d(tag,"stopMediaPlayer called")
+        _isMusicPlaying.value = false
+        if(mediaPlayer?.isPlaying==true){
+            mediaPlayer?.reset()
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        }
+    }
+    fun stopTimerJob(message:String){
+        timerJob?.cancel(CancellationException(message))
     }
 }
