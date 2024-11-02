@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.timer.data.Mode
 import com.example.timer.util.PreferencesKeys
+import com.example.timer.util.minutesToMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -143,8 +144,8 @@ open class TimerViewModel(val context:Context) :ViewModel() {
     ) {
         timerJob = viewModelScope.launch(Dispatchers.IO) {
             for (i in 1..cycles) {
-                val totalOddTime = oddIntervalInMin * 1000L
-                val totalEvenTime = evenIntervalInMin * 1000L
+                val totalOddTime = oddIntervalInMin.minutesToMillis()
+                val totalEvenTime = evenIntervalInMin.minutesToMillis()
                 _currentCycle.value = i
                 _oddTimeLeft.value = totalOddTime
                 _evenTimeLeft.value = totalEvenTime
@@ -162,8 +163,8 @@ open class TimerViewModel(val context:Context) :ViewModel() {
         soundUri: Uri,
         contentResolver: ContentResolver
     ) {
-        times.forEach { time ->
-            delay(time * 60 * 1000L)
+        times.forEach { timeInSec : Int ->
+            delay(timeInSec* 1000L)
             playBeep(soundUri, beepDuration, contentResolver)
         }
     }

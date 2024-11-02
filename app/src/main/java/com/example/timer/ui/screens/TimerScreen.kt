@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.timer.ui.TimerViewModel
 import com.example.timer.ui.components.CircularProgressArc
 import com.example.timer.ui.components.MusicAnimation
+import com.example.timer.util.minutesToMillis
 
 
 @Composable
@@ -49,9 +50,9 @@ fun TimerScreen(viewModel: TimerViewModel, onBackPressed: () -> Unit) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = "Cycle : $currentCycle of $totalCycleCount", fontSize = 20.sp)
             Spacer(modifier = Modifier.size(20.dp))
-            CircularProgressArc(oddTimeLeft, oddIntervalMinutes * 1000L)
+            CircularProgressArc(oddTimeLeft, oddIntervalMinutes.minutesToMillis())
             Spacer(modifier = Modifier.size(20.dp))
-            CircularProgressArc(evenTimeLeft, evenIntervalMinutes * 1000L, Color.Yellow)
+            CircularProgressArc(evenTimeLeft, evenIntervalMinutes.minutesToMillis(), Color.Yellow)
         }
         if (isMusicPlaying) {
             MusicAnimation()
