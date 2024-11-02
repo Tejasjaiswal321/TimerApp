@@ -1,6 +1,5 @@
 package com.example.timer.ui.screens
 
-import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +30,8 @@ fun Settings(
 ) {
     val mode by timerViewModel.mode.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    val isStartTimerEnabled =
+        timerViewModel.selectedSoundUri.collectAsState().value.path != ""//todo check isStartTimerEnabled
 
     Column(
         verticalArrangement = Arrangement.Top,
@@ -95,7 +96,7 @@ fun Settings(
         Spacer(modifier = Modifier.height(16.dp))
 
         val context = LocalContext.current
-        val soundUri = Uri.parse(timerViewModel.selectedSoundUri.value)
+        val soundUri = timerViewModel.selectedSoundUri.collectAsState().value
 
         Text(
             "Selected Sound: ${
@@ -104,32 +105,33 @@ fun Settings(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            onNextClick()
-            if (mode == Mode.OddEven) {
-                coroutineScope.launch {
-                    oddEvenTimer(
+        Button(
+            enabled = isStartTimerEnabled,
+            onClick = {
+                onNextClick()
+                if (mode == Mode.OddEven) {
+                    timerViewModel.oddEvenTimer(
                         oddTime = timerViewModel.oddTime.value.toIntOrNull() ?: 0,
                         evenTime = timerViewModel.evenTime.value.toIntOrNull() ?: 0,
                         cycles = timerViewModel.cycleCount.value.toIntOrNull() ?: 0,
-                        beepDuration = timerViewModel.beepDuration.value.toIntOrNull() ?: 5,
-                        soundUri = Uri.parse(timerViewModel.selectedSoundUri.value),
+                        beepDuration = timerViewModel.beepDuration.value.toLongOrNull() ?: 5L,
+                        soundUri = timerViewModel.selectedSoundUri.value,
                         contentResolver = context.contentResolver
                     )
+
+                } else {
+                    coroutineScope.launch {
+                        val times = timerViewModel.randomTimes.value.split(",")
+                            .mapNotNull { it.trim().toIntOrNull() }
+                        timerViewModel.randomTimer(
+                            times = times,
+                            beepDuration = timerViewModel.beepDuration.value.toLongOrNull() ?: 5L,
+                            soundUri = timerViewModel.selectedSoundUri.value,
+                            contentResolver = context.contentResolver
+                        )
+                    }
                 }
-            } else {
-                coroutineScope.launch {
-                    val times = timerViewModel.randomTimes.value.split(",")
-                        .mapNotNull { it.trim().toIntOrNull() }
-                    randomTimer(
-                        times = times,
-                        beepDuration = timerViewModel.beepDuration.value.toIntOrNull() ?: 5,
-                        soundUri = Uri.parse(timerViewModel.selectedSoundUri.value),
-                        contentResolver = context.contentResolver
-                    )
-                }
-            }
-        }) {
+            }) {
             Text("Start Timer")
         }
     }

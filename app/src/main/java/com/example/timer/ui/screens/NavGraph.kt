@@ -1,5 +1,6 @@
 package com.example.timer.ui.screens
 
+import android.content.Intent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,8 +18,8 @@ import com.example.timer.ui.TimerViewModel
 @Composable
 fun NavGraph(
     timerViewModel: TimerViewModel,
-    soundPickerLauncher: ActivityResultLauncher<String>,
-    paddingValues:PaddingValues,
+    soundPickerLauncher: ActivityResultLauncher<Intent>,
+    paddingValues: PaddingValues,
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -26,22 +27,34 @@ fun NavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Settings.name,
-        modifier = modifier.padding(paddingValues).padding(30.dp).fillMaxSize()
+        modifier = modifier
+            .padding(paddingValues)
+            .padding(30.dp)
+            .fillMaxSize()
     ) {
         composable(Screen.Settings.name) {
             Settings(
                 timerViewModel = timerViewModel,
-                onPickSound = { soundPickerLauncher.launch("audio/*") },
-                onNextClick = { navController.navigate(Screen.Timer.name) }
+                onPickSound = {
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "audio/*" // MIME type for audio files
+                        flags =
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+                    }
+                    soundPickerLauncher.launch(intent)
+//                    soundPickerLauncher.launch("audio/*") //todo check
+                },
+                onNextClick = {
+                    navController.navigate(Screen.Timer.name)
+                }
             )
         }
         composable(Screen.Timer.name) {
-            TimerApp(
-                timerViewModel = timerViewModel,
-                onBackPressed = {navController.clearBackStack(Screen.Settings.name)}
+            TimerScreen(
+                viewModel = timerViewModel,
+                onBackPressed = { navController.clearBackStack(Screen.Settings.name) }
             )
         }
-
     }
-
 }
