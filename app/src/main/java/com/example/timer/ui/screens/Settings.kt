@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.example.timer.data.Mode
 import com.example.timer.ui.InputRow
 import com.example.timer.ui.ModeSelectionDropDown
-import com.example.timer.ui.TimerViewModel
+import com.example.timer.ui.vm.TimerViewModel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -30,8 +30,16 @@ fun Settings(
 ) {
     val mode by timerViewModel.mode.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+
+    val context = LocalContext.current
+    val soundUri = timerViewModel.selectedSoundUri.collectAsState().value
+    val fileName = timerViewModel.getSoundFileName(soundUri, context.contentResolver)
     val isStartTimerEnabled =
-        timerViewModel.selectedSoundUri.collectAsState().value.path != ""//todo check isStartTimerEnabled
+        fileName?.isNotEmpty() == true &&
+                ((timerViewModel.oddIntervalMinutes.value.toLongOrNull() ?: 0L) > 0) &&
+                ((timerViewModel.evenIntervalMinutes.value.toLongOrNull() ?: 0L) > 0) &&
+                ((timerViewModel.cycleCount.value.toLongOrNull() ?: 0L) > 0) &&
+                ((timerViewModel.beepDuration.value.toLongOrNull() ?: 0L) > 0)
 
     Column(
         verticalArrangement = Arrangement.Top,
@@ -89,20 +97,11 @@ fun Settings(
         }
         Spacer(modifier = Modifier.height(16.dp))
         // Sound Picker
-        Button(onClick = { onPickSound();Log.d("a", "pick sound") }) {
+        Button(onClick = { onPickSound();Log.d("Settings", "pick sound") }) {
             Text("Select Sound")
         }
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        val context = LocalContext.current
-        val soundUri = timerViewModel.selectedSoundUri.collectAsState().value
-
-        Text(
-            "Selected Sound: ${
-                timerViewModel.getSoundFileName(soundUri, context.contentResolver)
-            }"
-        )
+        Text("Selected Sound: $fileName")
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(

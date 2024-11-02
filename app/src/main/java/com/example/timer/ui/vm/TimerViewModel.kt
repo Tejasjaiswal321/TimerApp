@@ -1,4 +1,4 @@
-package com.example.timer.ui
+package com.example.timer.ui.vm
 
 import android.app.Application
 import android.content.ContentResolver
@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -39,7 +40,7 @@ class TimerViewModelFactory(private val application: Application) : ViewModelPro
     }
 }
 
-open class TimerViewModel(val context:Context) :ViewModel() {
+open class TimerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val tag = "TimerViewModel"
 
@@ -54,7 +55,7 @@ open class TimerViewModel(val context:Context) :ViewModel() {
     val selectedSoundUri: StateFlow<Uri> get() = _selectedSoundUri
 
     var mediaPlayer: MediaPlayer? = null
-    var timerJob : Job? = null
+    var timerJob: Job? = null
 
 
     private val _oddTimeLeft = MutableStateFlow(-1L) // 1.0 for full progress, 0.0 when timer ends
@@ -86,6 +87,7 @@ open class TimerViewModel(val context:Context) :ViewModel() {
 
 
     private fun loadPreferences() {
+        val context = getApplication<Application>().applicationContext
         viewModelScope.launch {
             context.dataStore.data
                 .map { preferences ->
@@ -102,6 +104,7 @@ open class TimerViewModel(val context:Context) :ViewModel() {
     }
 
     fun savePreferences() {
+        val context = getApplication<Application>().applicationContext
         Log.d(tag, "saving Preferences")
         viewModelScope.launch {
             context.dataStore.edit { preferences ->
@@ -111,7 +114,7 @@ open class TimerViewModel(val context:Context) :ViewModel() {
                 preferences[PreferencesKeys.RANDOM_TIMES] = randomTimes.value
                 preferences[PreferencesKeys.BEEP_DURATION] = beepDuration.value
                 preferences[PreferencesKeys.SELECTED_SOUND_URI] =
-                    selectedSoundUri.value.path.toString()
+                    selectedSoundUri.value.toString()
             }
         }
     }
@@ -163,8 +166,8 @@ open class TimerViewModel(val context:Context) :ViewModel() {
         soundUri: Uri,
         contentResolver: ContentResolver
     ) {
-        times.forEach { timeInSec : Int ->
-            delay(timeInSec* 1000L)
+        times.forEach { timeInSec: Int ->
+            delay(timeInSec * 1000L)
             playBeep(soundUri, beepDuration, contentResolver)
         }
     }
@@ -174,7 +177,7 @@ open class TimerViewModel(val context:Context) :ViewModel() {
         duration: Long,
         contentResolver: ContentResolver
     ) {
-        Log.d(tag,"playBeep start")
+        Log.d(tag, "playBeep start")
         _isMusicPlaying.value = true
         mediaPlayer = MediaPlayer().apply {
             setDataSource(contentResolver.openAssetFileDescriptor(soundUri, "r")!!.fileDescriptor)
@@ -184,19 +187,24 @@ open class TimerViewModel(val context:Context) :ViewModel() {
         }
         delay(duration * 1000L)
         stopMediaPlayer()
-        Log.d(tag,"playBeep end")
+        Log.d(tag, "playBeep end")
     }
 
     fun stopMediaPlayer() {
-        Log.d(tag,"stopMediaPlayer called")
+        Log.d(tag, "stopMediaPlayer called")
         _isMusicPlaying.value = false
-        if(mediaPlayer?.isPlaying==true){
-            mediaPlayer?.reset()
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+        try {
+            if (mediaPlayer?.isPlaying == true) {
+                mediaPlayer?.reset()
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+            }
+        } catch (e: IllegalStateException) {
+            Log.d(tag, "Unable to stopMediaPlayer \n$e")
         }
     }
-    fun stopTimerJob(message:String){
+
+    fun stopTimerJob(message: String) {
         timerJob?.cancel(CancellationException(message))
     }
 }
